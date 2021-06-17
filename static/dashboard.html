@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<!-- based upon https://www.chartjs.org/samples/2.6.0/charts/line/basic.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>Line Chart</title>
+    <script src="./Chart.bundle.js"></script>
+    <script src="./utils.js"></script>
+    <style>
+    canvas{
+        -moz-user-select: none;
+        -webkit-user-select: none;
+        -ms-user-select: none;
+    }
+    </style>
+</head>
+
+<body>
+    <div style="width:75%;">
+        <canvas id="canvas" width="1367" height="683" style="display: block; height: 547px; width: 1094px;"></canvas>
+    </div>
+    <br>
+    <br>
+    Date <input id="date" value="2021-06-06" />
+    From <input list="countries" id="from-choice" value="NL"/>
+    To <input list="countries" id="to-choice" value="DE"/>
+    <datalist id="countries">
+        <option value="DE">
+        <option value="NL">
+    </datalist>
+    <button id="update-chart">Update Chart</button>
+    <script>
+
+        // date = "2021-06-06";
+        var timeFormat = "YYYY-MM-DD HH:mm"
+
+        function* hours(date) {
+            for (let i = 0; i < 24; i++) {
+                yield date + " " + i + ":00";
+            }
+        }
+
+        var color = Chart.helpers.color;
+        var config = {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [],
+            },
+            options: {
+                responsive: true,
+                title: {
+                    display: true,
+                    text: 'Flows',
+                },
+                scales: {
+                    xAxes: [{
+                        type: "time",
+                        barPercentage: 0.5,
+                        offset: true,
+                        time: {
+                            format: timeFormat,
+                            unit: 'hour',
+                            tooltipFormat: 'll HH:mm'
+                        },
+                    }],
+                    yAxes: [{
+                        display: true,
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Flow'
+                        }
+                    }]
+                }
+            }
+        };
+
+
+
+        function update_chart() {
+            var date = document.getElementById('date').value
+            var from_country = document.getElementById('from-choice').value
+            var to_country = document.getElementById('to-choice').value
+            config.data.labels = Array.from(hours(date))
+            console.log(config.data.labels)
+            config.data.datasets = [];
+            window.myLine.update();
+            function renderData(data) {
+                console.log(data);
+                if (data.length > 0) {
+                    hour_flows = Array(24).fill(0.0)
+                    data.forEach((value, index, array) => { hour_flows[value.hour] = value.flow; })
+                    console.log(hour_flows)
+                    dataset = {
+                        label: from_country + "->" + to_country,
+                        backgroundColor: color(window.chartColors.green).alpha(0.5).rgbString(),
+                        borderColor: window.chartColors.green,
+                        borderWidth: 1,
+                        fill: true,
+                        data: hour_flows,
+                    }
+                    config.data.datasets.push(dataset)
+                    window.myLine.update();
+                }
+            }
+            function update_country(to_country) {
+                fetch('/flows/net?country_from=' + from_country + '&country_to=' + to_country + '&date=' + date)
+                    .then(
+                        function (response) {
+                            if (response.status !== 200) {
+                                console.log('Looks like there was a problem. Status Code: ' +
+                                    response.status);
+                                return;
+                            }
+
+                            response.json().then(data => { renderData(data) });
+                        }
+                    )
+                    .catch(function (err) {
+                        console.log('Fetch Error :-S', err);
+                    });
+            }
+
+            update_country(to_country)
+        }
+
+        window.onload = function() {
+            var ctx = document.getElementById("canvas").getContext("2d");
+            window.myLine = new Chart(ctx, config);
+            update_chart();
+        };
+
+        document.getElementById('update-chart').addEventListener('click', function() {
+            update_chart();
+        });
+
+    </script>
+
+</body></html>
